@@ -32,82 +32,24 @@ module icevga2(input wire nrst,
   // Timing, sync generation
   ////////////////////////////////////////////////////////////////////////
 
-  reg [15:0] hcount; // horizontal count; if in range 0..799, pixel can be generated
-  reg [15:0] vcount; // vertical count; in in range 0..599, pixel can be generated
-  reg hsync_reg;
-  reg vsync_reg;
+  // hcount and vcount are the coordinates of the pixel to be generated
+  // on the next clock
+  wire [15:0] hcount;
+  wire [15:0] vcount;
 
-  assign vsync = vsync_reg;
-  assign hsync = hsync_reg;
+  // visible pixels are generated when hvis and vvis are both 1;
+  // non-zero color values should only be generated for visible pixels
+  wire hvis;
+  wire vvis;
 
-  always @(posedge clk)
-    begin
-
-      if (nrst == 1'b0)
-        begin
-          // reset asserted
-          hcount <= 16'b0;
-          vcount <= 16'b0;
-          hsync_reg <= 1'b0;
-          vsync_reg <= 1'b0;
-        end
-
-      else // (nrst == 1'b0)
-        begin
-          // not in reset, so update hcount/vcount, generate sync signals
-
-          if (hcount == H_VISIBLE_END)
-            begin
-              hcount <= hcount + 1;
-            end
-          else if (hcount == H_FRONT_PORCH_END)
-            begin
-              hcount <= hcount + 1;
-              hsync_reg <= 1'b1; // hsync pulse begins
-            end
-          else if (hcount == H_SYNC_PULSE_END)
-            begin
-              hcount <= hcount + 1;
-              hsync_reg <= 1'b0; // hsync pulse ends
-            end
-          else if (hcount == H_BACK_PORCH_END)
-            begin
-              // line ends, start next line
-              hcount <= 16'b0;
-
-              if (vcount == V_VISIBLE_END)
-                begin
-                  vcount <= vcount + 1;
-                end
-              else if (vcount == V_FRONT_PORCH_END)
-                begin
-                  vcount <= vcount + 1;
-                  vsync_reg <= 1'b1; // vsync pulse begins
-                end
-              else if (vcount == V_SYNC_PULSE_END)
-                begin
-                  vcount <= vcount + 1;
-                  vsync_reg <= 1'b0; // vsync pulse ends
-                end
-              else if (vcount == V_BACK_PORCH_END)
-                begin
-                  vcount <= 16'b0; // end of frame, begin next frame
-                end
-              else
-                begin
-                  // start next line
-                  vcount <= vcount + 1;
-                end
-            end
-          else
-            begin
-              // start next pixel in line
-              hcount <= hcount + 1;
-            end
-
-        end // (nrst == 1'b0)
-
-    end // always @(posedge clk)
+  timing_gen the_timing_gen(.nrst(nrst),
+                            .clk(clk),
+                            .hcount(hcount),
+                            .vcount(vcount),
+                            .hvis(hvis),
+                            .vvis(vvis),
+                            .hsync(hsync),
+                            .vsync(vsync));
 
   ////////////////////////////////////////////////////////////////////////
   // Pixel output
@@ -125,9 +67,6 @@ module icevga2(input wire nrst,
   assign green = green_reg;
   assign blue = blue_reg;
 
-  reg hvis; // in visible part of line horizontally?
-  reg vvis; // in visible part of frame vertically?
-
   always @(posedge clk)
     begin
 
@@ -137,32 +76,10 @@ module icevga2(input wire nrst,
           red_reg <= 4'b0;
           green_reg <= 4'b0;
           blue_reg <= 4'b0;
-          hvis <= 1'b1;
-          vvis <= 1'b1;
         end
 
       else
         begin
-          // update horizontal visibility
-          if (hcount == H_VISIBLE_END)
-            begin
-              hvis <= 1'b0; // end of horizontal visible area
-            end
-          else if (hcount == H_BACK_PORCH_END)
-            begin
-              hvis <= 1'b1; // end of horizontal back porch, will start new line
-
-              // update vertical visibility
-              if (vcount == V_VISIBLE_END)
-                begin
-                  vvis <= 1'b0; // end of vertical visible area
-                end
-              else if (vcount == V_BACK_PORCH_END)
-                begin
-                  vvis <= 1'b1; // end of frame, will start new frame
-                end
-            end
-
           if ((hvis & vvis) == 1'b1)
             begin
               // GET NEXT PIXEL COLOR!!!
