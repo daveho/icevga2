@@ -50,7 +50,7 @@ module fifo_512x8(input wire nrst,               // 0 means reset is asserted
   // reading data from FIFO
   always @(posedge clk)
     begin
-      if (rd == 1'b0 & not_empty)
+      if (nrst != 1'b0 & rd == 1'b0 & not_empty)
         begin
           rd_data <= fifo_data[rd_ptr]; // read data at current read pointer
           rd_ptr <= rd_ptr + 1; // advance read pointer
@@ -60,7 +60,7 @@ module fifo_512x8(input wire nrst,               // 0 means reset is asserted
   // writing data to the FIFO
   always @(posedge clk)
     begin
-      if (wr == 1'b0 & not_full)
+      if (nrst != 1'b0 & wr == 1'b0 & not_full)
         begin
           fifo_data[wr_ptr] <= wr_data; // write data at current write pointer
           wr_ptr <= wr_ptr + 1; // advance write pointer
