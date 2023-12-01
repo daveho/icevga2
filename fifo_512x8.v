@@ -36,22 +36,16 @@ module fifo_512x8(input wire nrst,               // 0 means reset is asserted
   assign not_empty = !empty;
   assign not_full = !full;
 
-  // FIXME: move these initializations into the read and write processes
+  // reading data from FIFO
   always @(posedge clk)
     begin
       if (nrst == 1'b0)
         begin
           // reset asserted
           rd_ptr <= 9'd0;
-          wr_ptr <= 9'd0;
           rd_data <= 8'd0;
         end
-    end
-
-  // reading data from FIFO
-  always @(posedge clk)
-    begin
-      if (nrst != 1'b0 & rd == 1'b0 & not_empty)
+      else if (rd == 1'b0 & not_empty)
         begin
           rd_data <= fifo_data[rd_ptr]; // read data at current read pointer
           rd_ptr <= rd_ptr + 1; // advance read pointer
@@ -61,7 +55,12 @@ module fifo_512x8(input wire nrst,               // 0 means reset is asserted
   // writing data to the FIFO
   always @(posedge clk)
     begin
-      if (nrst != 1'b0 & wr == 1'b0 & not_full)
+      if (nrst == 1'b0)
+        begin
+          // reset asserted
+          wr_ptr <= 9'd0;
+        end
+      if (wr == 1'b0 & not_full)
         begin
           fifo_data[wr_ptr] <= wr_data; // write data at current write pointer
           wr_ptr <= wr_ptr + 1; // advance write pointer
