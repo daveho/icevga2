@@ -36,6 +36,7 @@ module fifo_512x8(input wire nrst,               // 0 means reset is asserted
   assign not_empty = !empty;
   assign not_full = !full;
 
+  // FIXME: move these initializations into the read and write processes
   always @(posedge clk)
     begin
       if (nrst == 1'b0)
