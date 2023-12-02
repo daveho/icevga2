@@ -36,6 +36,7 @@ module icevga2(input wire nrst,
   // on the next clock
   wire [15:0] hcount;
   wire [15:0] vcount;
+  wire [15:0] hcount_ahead1;
 
   // visible pixels are generated when hvis and vvis are both 1;
   // non-zero color values should only be generated for visible pixels
@@ -46,6 +47,7 @@ module icevga2(input wire nrst,
                             .clk(clk),
                             .hcount(hcount),
                             .vcount(vcount),
+                            .hcount_ahead1(hcount_ahead1),
                             .hvis(hvis),
                             .vvis(vvis),
                             .hsync(hsync),
