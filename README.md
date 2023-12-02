@@ -46,6 +46,15 @@ the correct pixels in the correct rows and columns):
 
 ## Progress Log
 
+12/2/2023: Implemented a pixel buffer ([pixbuf.v](pixbuf.v)). This is a
+1024x16 dual ported RAM (inferred as 4 256x16 block RAMs) from which
+pixel color values are read by the main pixel color output process.
+So, any pixel color values we put in here will be output to the display
+(assuming that they are put in at the appropriate time.) This seems to
+work! The pixel buffer is initialized with some 6x6x6 RGB color cube
+values, just so we have something to display, since no process is actually
+storing data to the pixel buffer yet.
+
 11/28/2023: Made the github project public and added more information
 to the readme.
 

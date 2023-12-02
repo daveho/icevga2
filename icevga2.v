@@ -54,6 +54,33 @@ module icevga2(input wire nrst,
                             .vsync(vsync));
 
   ////////////////////////////////////////////////////////////////////////
+  // Pixel buffer
+  ////////////////////////////////////////////////////////////////////////
+
+  // The pixel output process reads from the pixel buffer
+  wire pixbuf_rd;
+  wire [9:0] pixbuf_rd_addr;
+  wire [15:0] pixbuf_rd_data;
+
+  wire pixbuf_wr;             // eventually this will be a reg
+  wire [9:0] pixbuf_wr_addr;  // eventually this will be a reg
+  wire [15:0] pixbuf_wr_data; // eventually this will be a reg
+
+  // For now, there are no writes to the pixbuf
+  assign pixbuf_wr = 1'b1;
+  assign pixbuf_wr_addr = 10'd0;
+  assign pixbuf_wr_data = 16'd0;
+
+  pixbuf the_pixbuf(.nrst(nrst),
+                    .clk(clk),
+                    .rd(pixbuf_rd),
+                    .rd_addr(pixbuf_rd_addr),
+                    .rd_data(pixbuf_rd_data),
+                    .wr(pixbuf_wr),
+                    .wr_addr(pixbuf_wr_addr),
+                    .wr_data(pixbuf_wr_data));
+
+  ////////////////////////////////////////////////////////////////////////
   // Pixel output
   ////////////////////////////////////////////////////////////////////////
 
@@ -69,6 +96,24 @@ module icevga2(input wire nrst,
   assign green = green_reg;
   assign blue = blue_reg;
 
+  // Continuously assert the pixbuf_rd signal.
+  // This means that we are sometimes reading data
+  // values from the pixel buffer that we don't need.
+  // But there should be no harm in doing that, and
+  // it's much simpler than trying to assert pixbuf_rd
+  // conditionally.
+  assign pixbuf_rd = 1'b0;
+
+  // hcount_ahead1 should, in theory, always have the
+  // correct address in the pixel buffer of the pixel we
+  // want to output next.
+  assign pixbuf_rd_addr = hcount_ahead1;
+
+  // next_pixel contains the RGB color values of the next pixel
+  // to output. It stores the value most recently read from the
+  // pixel buffer.
+  reg [15:0] next_pixel;
+
   always @(posedge clk)
     begin
 
@@ -78,15 +123,22 @@ module icevga2(input wire nrst,
           red_reg <= 4'b0;
           green_reg <= 4'b0;
           blue_reg <= 4'b0;
+          next_pixel <= 16'd0;
         end
 
       else
         begin
+          // On every clock cycle, fetch the next pixel color value from
+          // the pixel buffer
+          next_pixel <= pixbuf_rd_data;
+
+          // Output a pixel if it will be in the visible region.
           if ((hvis & vvis) == 1'b1)
             begin
               // GET NEXT PIXEL COLOR!!!
-              // In the future, this should come from another process.
-              // For now, just draw a grid.
+/*
+              // Just draw a grid of yellow lines on a blue background.
+              // The left column and top row of pixels should be yellow.
               if ((hcount[3:0] == 4'b0) | (vcount[3:0] == 4'b0))
                 begin
                   red_reg <= 4'hC;
@@ -99,6 +151,11 @@ module icevga2(input wire nrst,
                   green_reg <= 4'h0;
                   blue_reg <= 4'h5;
                 end
+*/
+              // Output the next pixel color from the pixel buffer
+              red_reg <= next_pixel[11:8];
+              green_reg <= next_pixel[7:4];
+              blue_reg <= next_pixel[3:0];
             end
           else
             begin
