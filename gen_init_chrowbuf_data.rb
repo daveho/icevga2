@@ -5,17 +5,15 @@
 # without actually needing external data (the interface to
 # the host system will be the last part of the project.)
 
-# VGA text mode colors (which is the palette we'll use initially)
-
-# The base 8 colors: add 8 to make them intense
+# xterm colors (add 8 to make intense)
 COLORS = {
   'black' => 0,
-  'blue' => 1,
+  'red' => 1,
   'green' => 2,
-  'cyan' => 3,
-  'red' => 4,
+  'yellow' => 3,
+  'blue' => 4,
   'magenta' => 5,
-  'yellow' => 6,
+  'cyan' => 6,
   'gray' => 7,
 }
 
@@ -42,12 +40,12 @@ puts ""
 count = text.length
 (0..count-1).each do |i|
   val = (attr[i].ord << 8 | text[i].ord)
-  puts "chrow_data[8'd#{i}] <= 8'd#{val};"
+  puts "chrow_data[8'd#{i}] = 8'd#{val};"
 end
 
 j = count
 while j < 256
-  puts "chrow_data[8'd#{j}] <= 8'd0;"
+  puts "chrow_data[8'd#{j}] = 8'd0;"
   j += 1
 end
 
