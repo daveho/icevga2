@@ -13,9 +13,9 @@ module palette(input nrst,
                input wr,                   // 0=write data, 1=don't write data
                input [7:0] wr_addr,        // which palette entry to write
                input [15:0] wr_data        // color value to write
-              )
+              );
 
-  reg [15:0] color_data[7:0];
+  reg [15:0] color_data[255:0];
 
   // Initialize with an approximation of the 256-color xterm palette
   initial

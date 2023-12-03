@@ -19,7 +19,7 @@ module chrowbuf(input nrst,
                 input wr,                  // 0=write data, 1=don't write data
                 input [7:0] wr_addr,       // which attr/code pair to write
                 input [15:0] wr_data       // attr/code data to write
-               )
+               );
 
   reg [15:0] chrow_data[255:0];
 

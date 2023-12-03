@@ -81,6 +81,73 @@ module icevga2(input wire nrst,
                     .wr_data(pixbuf_wr_data));
 
   ////////////////////////////////////////////////////////////////////////
+  // Character attribute/code row buffer
+  ////////////////////////////////////////////////////////////////////////
+
+  // The character renderer will drive/use these
+  reg chrowbuf_rd;
+  reg [7:0] chrowbuf_rd_addr;
+  wire [15:0] chrowbuf_rd_data;
+
+  // For now, we don't write to the row buffer
+  wire chrowbuf_wr;
+  wire [7:0] chrowbuf_wr_addr;
+  wire [15:0] chrowbuf_wr_data;
+  assign chrowbuf_wr = 1'b1;
+  assign chrowbuf_wr_addr = 8'd0;
+  assign chrowbuf_wr_data = 16'd0;
+
+  chrowbuf the_chrowbuf(.nrst(nrst),
+                        .clk(clk),
+                        .rd(chrowbuf_rd),
+                        .rd_addr(chrowbuf_rd_addr),
+                        .rd_data(chrowbuf_rd_data),
+                        .wr(chrowbuf_wr),
+                        .wr_addr(chrowbuf_wr_addr),
+                        .wr_data(chrowbuf_wr_data));
+
+  ////////////////////////////////////////////////////////////////////////
+  // Palette
+  ////////////////////////////////////////////////////////////////////////
+
+  // The character renderer will drive/use these
+  reg palette_rd;
+  reg [7:0] palette_rd_addr;
+  wire [15:0] palette_rd_data;
+
+  // For now, we don't write to the palette
+  wire palette_wr;
+  wire [7:0] palette_wr_addr;
+  wire [15:0] palette_wr_data;
+  assign palette_wr = 1'b1;
+  assign palette_wr_addr = 8'd0;
+  assign palette_wr_data = 16'd0;
+
+  palette the_palette(.nrst(nrst),
+                      .clk(clk),
+                      .rd(palette_rd),
+                      .rd_addr(palette_rd_addr),
+                      .rd_data(palette_rd_data),
+                      .wr(palette_wr),
+                      .wr_addr(palette_wr_addr),
+                      .wr_data(palette_wr_data));
+
+  ////////////////////////////////////////////////////////////////////////
+  // Character renderer
+  ////////////////////////////////////////////////////////////////////////
+
+  // For now, do-nothing implementation that just drives
+  // the signals controlling reads from the character row buffer
+  // and the palette
+  always @(posedge clk)
+    begin
+      chrowbuf_rd <= 1'b1;
+      chrowbuf_rd_addr <= 8'd0;
+      palette_rd <= 1'b1;
+      palette_rd_addr <= 8'd0;
+    end
+
+  ////////////////////////////////////////////////////////////////////////
   // Pixel output
   ////////////////////////////////////////////////////////////////////////
 

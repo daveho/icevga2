@@ -40,12 +40,12 @@ puts ""
 count = text.length
 (0..count-1).each do |i|
   val = (attr[i].ord << 8 | text[i].ord)
-  puts "chrow_data[8'd#{i}] = 8'd#{val};"
+  puts "chrow_data[8'd#{i}] = 16'd#{val};"
 end
 
 j = count
 while j < 256
-  puts "chrow_data[8'd#{j}] = 8'd0;"
+  puts "chrow_data[8'd#{j}] = 16'd0;"
   j += 1
 end
 
