@@ -192,13 +192,19 @@ module icevga2(input wire nrst,
       if (nrst == 1'b0)
         begin
           // in reset
+
           chrowbuf_rd <= 1'b1;
           chrowbuf_rd_addr <= 8'd0;
           palette_rd <= 1'b1;
           palette_rd_addr <= 8'd0;
-          render_active = 1'b0; // wait until second pixel row to start rendering
+          fontmem_rd <= 1'b1;
+          fontmem_rd_addr <= 12'd0;
+
           pixbuf_wr <= 1'b1;
           pixbuf_wr_addr <= 16'd0;
+
+          render_active = 1'b0; // wait until second pixel row to start rendering
+          render_display_pixel_row <= 16'd0;
         end
       else // (nrst == 1'b0)
         begin
@@ -210,13 +216,13 @@ module icevga2(input wire nrst,
               render_active <= 1'b1;
 
               // while active, write to pixbuf on every cycle
-              //pixbuf_wr <= 1'b0;
+              pixbuf_wr <= 1'b0;
 
               // The first 8 pixels generated are meaningless, since we won't
               // have accurate attribute/color/character/pattern data yet.
               // So, put them at the end of the pixel buffer (where they won't be
               // visible.)
-              pixbuf_wr_addr <= 12'd1016;
+              pixbuf_wr_addr <= 10'd1016;
               pixbuf_wr_data <= 16'd0;
 
               // Which row of pixels is being generated:
@@ -249,7 +255,7 @@ module icevga2(input wire nrst,
                 end
 
               // Advance the write address in the pixel buffer
-              pixbuf_wr_addr <= pixbuf_wr_addr + 16'd1;
+              pixbuf_wr_addr <= pixbuf_wr_addr + 10'd1;
 
               // Shift current pattern or load next pattern
               if (render_tick == 3'd7)
@@ -287,6 +293,7 @@ module icevga2(input wire nrst,
               //      de-assert palette read signal, advance character row read
               //      address
               case (render_tick)
+/*
                 3'd0:
                   begin
                     chrowbuf_rd <= 1'b0;
@@ -339,6 +346,13 @@ module icevga2(input wire nrst,
 
                     // we can deassert read from the palette now
                     palette_rd <= 1'b1;
+                  end
+*/
+                3'd0:
+                  begin
+                    render_next_pattern = 8'b10001010;
+                    render_next_bg_color = 16'd0;
+                    render_next_fg_color = 16'b0000100010001000;
                   end
               endcase
 
