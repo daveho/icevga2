@@ -46,6 +46,17 @@ the correct pixels in the correct rows and columns):
 
 ## Progress Log
 
+12/5/2023: Working on character rendering process. The eventual goal
+is to add pixel colors to the pixel buffer based (1) the row of
+attribute/character pairs for the current row of characters, (2)
+the font memory containing the pixel patterns for each row of the
+different character glyphs, and (3) the palette containing the
+colors (for lookup of background and foreground colors for the
+character attribute.) Current progress is a fixed pattern of
+background and foreground colors is display somewhat correctly,
+although the pixels are offset one column to the right of where
+they should be.
+
 12/2/2023: Implemented a pixel buffer ([pixbuf.v](pixbuf.v)). This is a
 1024x16 dual ported RAM (inferred as 4 256x16 block RAMs) from which
 pixel color values are read by the main pixel color output process.
