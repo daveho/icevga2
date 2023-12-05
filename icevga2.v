@@ -207,13 +207,15 @@ module icevga2(input wire nrst,
              // to the pixel buffer
              render_active <= 1'b1;
              render_cur_pattern <= 8'b10000000;
-             render_cur_bg_color <= 16'h0006;
-             render_cur_fg_color <= 16'h0ff0;
+             render_cur_bg_color <= 16'd0;
+             render_cur_fg_color <= 16'd0;
 
              // The first computed write to the pixel buffer is 8 positions
              // from the end, because the first 8 pixel colors added
-             // to the pixel buffer won't be valid.
-             pixbuf_wr_addr <= 10'd1016;
+             // to the pixel buffer won't be valid. (We set the pixbuf
+             // write address to 9 positions from the end, because it will
+             // be incremented when the first actual pixel is generated.)
+             pixbuf_wr_addr <= 10'd1015;
            end
          else if (render_active == 1'b1)
            begin
