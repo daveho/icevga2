@@ -165,27 +165,11 @@ module icevga2(input wire nrst,
   // Character renderer
   ////////////////////////////////////////////////////////////////////////
 
-  // The character renderer starts generating pixels into the
-  // pixel buffer 32 cycles ahead of the time when the pixel
-  // output process will starting outputting them to the display.
+  reg render_active;
 
-  reg render_active; // 1=active, 0=not active
-
-  // Which display pixel row will be generated
-  reg [15:0] render_display_pixel_row;
-
-  // Data for block of 8 pixels currently being rendered
-  reg [255:0] render_cur_pattern; // current 8-pixel pattern being generated
-  reg [15:0] render_cur_bg_color; // background color of current pattern
-  reg [15:0] render_cur_fg_color; // foreground color of current pattern
-
-  // Data to set up for next block of 8 pixels
-  reg [3:0] render_next_fg_attr; // fg attribute value
-  reg [7:0] render_next_pattern; // next 8-pixel pattern to generate
-  reg [15:0] render_next_bg_color; // background color of next pattern
-  reg [15:0] render_next_fg_color; // foreground color of next pattern
-
-  reg [7:0] render_tick; // ticks counting progress in outputting the current 8-pixel pattern
+  reg[7:0] render_cur_pattern;   // current pattern of 8 pixels
+  reg[15:0] render_cur_bg_color; // current background color
+  reg[15:0] render_cur_fg_color; // current foreground color
 
   always @(posedge clk)
     begin
@@ -193,184 +177,92 @@ module icevga2(input wire nrst,
         begin
           // in reset
 
+          // for now, don't read from the character row buffer,
+          // the font memory, or the palette
           chrowbuf_rd <= 1'b1;
           chrowbuf_rd_addr <= 8'd0;
-          palette_rd <= 1'b1;
-          palette_rd_addr <= 8'd0;
           fontmem_rd <= 1'b1;
           fontmem_rd_addr <= 12'd0;
+          palette_rd <= 1'b1;
+          palette_rd_addr <= 8'd0;
 
+          // writes to pixbuf happen only after we're out of reset
           pixbuf_wr <= 1'b1;
-          pixbuf_wr_addr <= 16'd0;
+          pixbuf_wr_addr <= 10'd0;
+          pixbuf_wr_data <= 16'd0;
 
-          render_active = 1'b0; // wait until second pixel row to start rendering
-          render_display_pixel_row <= 16'd0;
+          // state information for rendering logic
+          render_active <= 1'b0; // start rendering on second row of pixels
+          render_cur_pattern <= 8'd0;
+          render_cur_bg_color <= 16'd0;
+          render_cur_fg_color <= 16'd0;
         end
-      else // (nrst == 1'b0)
-        begin
-          // not in reset
+     else
+       begin
+         // not in reset
 
-          if (render_active == 1'b0 && hcount == H_BACK_PORCH_END - 16'd48)
-            begin
-              // Wake up and start rendering
-              render_active <= 1'b1;
+         if (render_active == 1'b0 && hcount == H_BACK_PORCH_END - 16'd16)
+           begin
+             // wake up and start rendering current row of pixels
+             // to the pixel buffer
+             render_active <= 1'b1;
+             render_cur_pattern <= 8'b10000000;
+             render_cur_bg_color <= 16'h0006;
+             render_cur_fg_color <= 16'h0ff0;
 
-              // while active, write to pixbuf on every cycle
-              pixbuf_wr <= 1'b0;
+             // The first computed write to the pixel buffer is 8 positions
+             // from the end, because the first 8 pixel colors added
+             // to the pixel buffer won't be valid.
+             pixbuf_wr_addr <= 10'd1016;
+           end
+         else if (render_active == 1'b1)
+           begin
+             // rendering is active
 
-              // The first 8 pixels generated are meaningless, since we won't
-              // have accurate attribute/color/character/pattern data yet.
-              // So, put them at the end of the pixel buffer (where they won't be
-              // visible.)
-              pixbuf_wr_addr <= 10'd1016;
-              pixbuf_wr_data <= 16'd0;
+             // Output the current pixel color to the pixel buffer
+             if ((render_cur_pattern & 8'h80) == 8'h80)
+               begin
+                 pixbuf_wr_data <= render_cur_fg_color;
+               end
+             else
+               begin
+                 pixbuf_wr_data <= render_cur_bg_color;
+               end
 
-              // Which row of pixels is being generated:
-              // note that this wakeup happens during the line preceding
-              // the one we want to render
-              render_display_pixel_row <= vcount + 16'd1;
+             // Update pattern and bg/fg colors for next pixel
+             if (pixbuf_wr_addr[2:0] == 3'b111)
+               begin
+                 // reached end of current pattern, activate next pattern
+                 // and fg/bg colors (hard-coded for now, eventually should
+                 // be pattern loaded from font memory and bg/fg colors
+                 // loaded from palette)
+                 render_cur_pattern <= 8'b10000000;
+                 //render_cur_bg_color <= {4'd0, pixbuf_wr_addr[3:0], 8'd0};
+                 render_cur_bg_color <= 16'h0006;
+                 render_cur_fg_color <= 16'h0ff0;
+               end
+             else
+               begin
+                 render_cur_pattern <= (render_cur_pattern << 1);
+               end
 
-              // Initial (invalid) pattern of bg/fg pixels
-              render_cur_pattern <= 8'd0;
-              render_cur_bg_color <= 16'd0;
-              render_cur_fg_color <= 16'd0;
+             // Advance to next pixel
+             pixbuf_wr_addr <= pixbuf_wr_addr + 10'd1;
 
-              // Start at beginning of pattern
-              render_tick <= 3'd0;
-            end
-
-          else if (render_active == 1'b1)
-            begin
-
-              // Generate the next pixel
-              if ((render_cur_pattern & 8'h80) == 8'h80)
-                begin
-                  // next pixel is foreground color
-                  pixbuf_wr_data <= render_cur_fg_color;
-                end
-              else
-                begin
-                  // next pixel is background color
-                  pixbuf_wr_data <= render_cur_bg_color;
-                end
-
-              // Advance the write address in the pixel buffer
-              pixbuf_wr_addr <= pixbuf_wr_addr + 10'd1;
-
-              // Shift current pattern or load next pattern
-              if (render_tick == 3'd7)
-                begin
-                  // load next pattern
-                  render_cur_pattern <= render_next_pattern;
-                end
-              else
-                begin
-                  // shift to next bit in current pattern
-                  render_cur_pattern <= (render_cur_pattern << 1);
-
-                  // next fg and bg colors should be good by now
-                  render_cur_bg_color <= render_next_bg_color;
-                  render_cur_fg_color <= render_next_fg_color;
-                end
-
-              // The tick count generates an 8-cycle cadence, with the following
-              // actions being taken on specific ticks:
-              //
-              //   0: assert read from character row buf, assert read from palette,
-              //      assert read from font data
-              //
-              //   1: assert bg attr as read address to palette,
-              //      store fg attr (temporarily),
-              //      assert character code as read address to font mem,
-              //      de-assert read from character row buf,
-              //      increment character row read address
-              //
-              //   2: store background color (read from palette) to next bg color,
-              //      store pattern to next_pattern,
-              //      assert fg attr as palette read address
-              //
-              //   3: store foreground color (read from palette) to next fg color,
-              //      de-assert palette read signal, advance character row read
-              //      address
-              case (render_tick)
-/*
-                3'd0:
-                  begin
-                    chrowbuf_rd <= 1'b0;
-                    palette_rd <= 1'b0;
-                    fontmem_rd <= 1'b0;
-                  end
-
-                3'd1:
-                  begin
-                    // attribute/character code data is available now
-
-                    // read color for background attribute from palette
-                    palette_rd_addr <= {4'd0, chrowbuf_rd_data[15:12]};
-
-                    // temporarily store foreground attribute
-                    render_next_fg_attr <= chrowbuf_rd_data[11:8];
-
-                    // assert character code and pattern row as read address
-                    // from font data
-                    fontmem_rd_addr <= {chrowbuf_rd_data[7:0], render_display_pixel_row[3:0]};
-
-                    // we can deassert read from the character row buf now
-                    chrowbuf_rd <= 1'b1;
-
-                    // advance to next location in character row buf
-                    chrowbuf_rd_addr <= chrowbuf_rd_addr + 8'd1;
-                  end
-
-                3'd2:
-                  begin
-                    // character pattern and background color information are available now
-
-                    // store pattern data
-                    render_next_pattern <= fontmem_rd_data;
-
-                    // store background color
-                    render_next_bg_color <= palette_rd_data;
-
-                    // we can deassert read from the font memory now
-                    fontmem_rd <= 1'b1;
-
-                    // assert foreground attribute as address to read from palette
-                    palette_rd_addr <= {4'd0, render_next_fg_attr};
-                  end
-
-                3'd3:
-                  begin
-                    // foreground color is available now
-                    render_next_fg_color <= palette_rd_data;
-
-                    // we can deassert read from the palette now
-                    palette_rd <= 1'b1;
-                  end
-*/
-                3'd0:
-                  begin
-                    render_next_pattern = 8'b10001010;
-                    render_next_bg_color = 16'd0;
-                    render_next_fg_color = 16'b0000100010001000;
-                  end
-              endcase
-
-              if (pixbuf_wr_addr == 10'd799)
-                begin
-                  // Reached end of visible line, so deactivate the renderer
-                  render_active <= 1'b0;
-                  chrowbuf_rd <= 1'b1;
-                  palette_rd <= 1'b1;
-                  pixbuf_wr <= 1'b1;
-                end
-
-              // advance tick counter
-              render_tick <= render_tick + 3'd1;
-
-            end
-
-        end
+             // done rendering this row of pixels?
+             if (pixbuf_wr_addr == 12'd799) // FIXME: shouldn't hard code
+               begin
+                 // done rendering
+                 render_active <= 1'b0;
+                 pixbuf_wr <= 1'b1; // deassert write to pixbuf
+               end
+             else
+               begin
+                 // continue rendering
+                 pixbuf_wr <= 1'b0;
+               end
+           end
+       end
     end
 
   ////////////////////////////////////////////////////////////////////////
