@@ -167,20 +167,15 @@ module icevga2(input wire nrst,
 
   reg render_active;
 
-  reg[7:0] render_cur_pattern;   // current pattern of 8 pixels
-  reg[15:0] render_cur_bg_color; // current background color
-  reg[15:0] render_cur_fg_color; // current foreground color
+  reg [3:0] render_cur_pixel_row;
 
-  // which pixel row (0..15) in the current row of characters
-  // is being rendered
-  reg[3:0] render_cur_pixel_row;
+  reg [7:0] render_cur_pattern;
+  reg [15:0] render_cur_bg_color;
+  reg [15:0] render_cur_fg_color;
 
-  reg[7:0] render_next_pattern; // next pattern of 8 pixels
-
-  // The lowest 3 bits of pixbuf_wr_addr indicate which column of
-  // the current character is being rendered.
-  wire [2:0] render_cur_ch_col;
-  assign render_cur_ch_col = pixbuf_wr_addr[2:0];
+  reg [7:0] render_next_pattern;
+  reg [15:0] render_next_bg_color;
+  reg [15:0] render_next_fg_color;
 
   always @(posedge clk)
     begin
@@ -188,115 +183,78 @@ module icevga2(input wire nrst,
         begin
           // in reset
 
-          // don't read from character row buffer, font memory,
-          // or palette yet
-          chrowbuf_rd <= 1'b1;
-          chrowbuf_rd_addr <= 8'd0;
-          fontmem_rd <= 1'b1;
-          fontmem_rd_addr <= 12'd0;
-          palette_rd <= 1'b1;
-          palette_rd_addr <= 8'd0;
-
-          // We'll start writing to the pixel buffer right away,
-          // even though the first 8 pixels won't be "correct"
-          pixbuf_wr <= 1'b0;
-          pixbuf_wr_addr <= 10'd0;
-          pixbuf_wr_data <= 16'd0;
-
-          // state information for rendering logic
           render_active <= 1'b1; // start rendering right away
-          render_cur_pattern <= 8'd0;
-          render_cur_bg_color <= 16'd0;
-          render_cur_fg_color <= 16'd0;
+
           render_cur_pixel_row <= 4'd0;
-          render_next_pattern <= 8'd0;
+
+          render_cur_pattern <= 8'b10001010;
+          render_cur_bg_color <= 16'h0004;
+          render_cur_fg_color <= 16'h0cc0;
+
+          render_next_pattern <= 8'b10001010;
+          render_next_bg_color <= 16'h0004;
+          render_next_fg_color <= 16'h0880;
+
+          pixbuf_wr <= 1'b1; // don't start writing yet
+          pixbuf_wr_addr <= 10'd1016;
         end
-     else
-       begin
-         // not in reset
+      else
+        begin
+          // not in reset
 
-         if (render_active == 1'b0 && hcount == H_BACK_PORCH_END - 16'd16)
-           begin
-             // wake up and start rendering current row of pixels
-             // to the pixel buffer
-             render_active <= 1'b1;
-             render_cur_pattern <= 8'b10000000;
-             render_cur_bg_color <= 16'd0;
-             render_cur_fg_color <= 16'd0;
+          if (render_active == 1'b1)
+            begin
+              // rendering
 
-             // The first computed write to the pixel buffer is 8 positions
-             // from the end, because the first 8 pixel colors added
-             // to the pixel buffer won't be valid. (We set the pixbuf
-             // write address to 9 positions from the end, because it will
-             // be incremented when the first actual pixel is generated.)
-             pixbuf_wr_addr <= 10'd1015;
+              // output next pixel color
+              if (render_cur_pattern[7] == 1'b1)
+                begin
+                  pixbuf_wr_data <= render_cur_fg_color;
+                end
+              else
+                begin
+                  pixbuf_wr_data <= render_cur_bg_color;
+                end
 
-             // Determine next pixel row
-             render_cur_pixel_row <= vcount[3:0] + 4'd1;
-           end
-         else if (render_active == 1'b1)
-           begin
-             // rendering is active
+              // update pattern and bg/fg colors as necessary
+              if (pixbuf_wr_addr[2:0] == 3'd7)
+                begin
+                  render_cur_pattern <= render_next_pattern;
+                  render_cur_bg_color <= render_next_bg_color;
+                  render_cur_fg_color <= render_next_fg_color;
+                end
+              else
+                begin
+                  render_cur_pattern <= (render_cur_pattern << 1);
+                end
 
-             // Output the current pixel color to the pixel buffer
-             if ((render_cur_pattern & 8'h80) == 8'h80)
-               begin
-                 pixbuf_wr_data <= render_cur_fg_color;
-               end
-             else
-               begin
-                 pixbuf_wr_data <= render_cur_bg_color;
-               end
+              // advance pixbuf write address
+              pixbuf_wr_addr <= pixbuf_wr_addr + 10'd1;
 
-             // Update pattern and bg/fg colors for next pixel
-             // this is a state machine which requires multiple cycles)
-             if (render_cur_ch_col == 3'd0)
-               begin
-                 // For now, read the appropriate row of one specific
-                 // glyph
-                 fontmem_rd_addr <= {8'd88, render_cur_pixel_row};
-                 fontmem_rd <= 1'b0;
-               end
-             else if (render_cur_ch_col == 3'd1)
-               begin
-                 // Font pattern data should be available now
-                 render_next_pattern <= fontmem_rd_data;
-                 fontmem_rd <= 1'b1;
-               end
-             else if (render_cur_ch_col == 3'd7)
-               begin
-                 // reached end of current pattern, activate next pattern
-                 // and fg/bg colors
-                 render_cur_pattern <= render_next_pattern;
-                 // TODO: make bg and fg colors be loaded from palette
-                 //render_cur_bg_color <= {4'd0, 8'h03, 1'b0, pixbuf_wr_addr[5:3]};
-                 render_cur_bg_color <= 16'd4;
-                 render_cur_fg_color <= 16'h0ff0;
-               end
-             else
-               begin
-                 render_cur_pattern <= (render_cur_pattern << 1);
-               end
+              // done with this row of pixels?
+              if (pixbuf_wr_addr == 12'd800)
+                begin
+                  // done rendering one row of pixels
+                  pixbuf_wr <= 1'b1;
+                  render_active <= 1'b0;
+                end
+              else
+                begin
+                  // begin or continue writing to pixbuf
+                  pixbuf_wr <= 1'b0;
+                end
 
-             // Advance to next pixel
-             pixbuf_wr_addr <= pixbuf_wr_addr + 10'd1;
-
-             // done rendering this row of pixels?
-             if (pixbuf_wr_addr == 12'd799) // FIXME: shouldn't hard code
-               begin
-                 // done rendering
-                 render_active <= 1'b0;
-                 pixbuf_wr <= 1'b1; // deassert write to pixbuf
-                 //render_cur_pixel_row <= render_cur_pixel_row + 4'd1; // advance to next pixel row
-                 //render_cur_pixel_row <= vcount[3:0];
-               end
-             else
-               begin
-                 // continue rendering
-                 pixbuf_wr <= 1'b0;
-               end
-           end
-       end
+            end
+          else
+            begin
+              // not rendering
+              if (hcount == H_BACK_PORCH_END - 16'd16)
+                begin
+                  // wake up
+                  render_active <= 1'b1;
+                end
+            end
+        end
     end
 
   ////////////////////////////////////////////////////////////////////////
