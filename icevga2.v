@@ -196,7 +196,7 @@ module icevga2(input wire nrst,
           render_next_fg_color <= 16'h0cc0;
 
           pixbuf_wr <= 1'b1; // don't start writing yet
-          pixbuf_wr_addr <= 10'd1016;
+          pixbuf_wr_addr <= 10'd0;
         end
       else
         begin
@@ -255,6 +255,7 @@ module icevga2(input wire nrst,
                   pixbuf_wr_addr <= 1'b0;
                   render_cur_bg_color <= 16'd0;
                   render_cur_fg_color <= 16'd0;
+                  pixbuf_wr_addr <= 10'd1016;
                 end
             end
         end
