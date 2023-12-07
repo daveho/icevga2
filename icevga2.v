@@ -171,6 +171,10 @@ module icevga2(input wire nrst,
   reg[15:0] render_cur_bg_color; // current background color
   reg[15:0] render_cur_fg_color; // current foreground color
 
+  // which pixel row (0..15) in the current row of characters
+  // is being rendered
+  reg[3:0] render_cur_pixel_row;
+
   always @(posedge clk)
     begin
       if (nrst == 1'b0)
@@ -186,16 +190,18 @@ module icevga2(input wire nrst,
           palette_rd <= 1'b1;
           palette_rd_addr <= 8'd0;
 
-          // writes to pixbuf happen only after we're out of reset
-          pixbuf_wr <= 1'b1;
+          // We'll start writing to the pixel buffer right away,
+          // even though the first 8 pixels won't be "correct"
+          pixbuf_wr <= 1'b0;
           pixbuf_wr_addr <= 10'd0;
           pixbuf_wr_data <= 16'd0;
 
           // state information for rendering logic
-          render_active <= 1'b0; // start rendering on second row of pixels
+          render_active <= 1'b1; // start rendering right away
           render_cur_pattern <= 8'd0;
           render_cur_bg_color <= 16'd0;
           render_cur_fg_color <= 16'd0;
+          render_cur_pixel_row <= 4'd0;
         end
      else
        begin
@@ -257,6 +263,7 @@ module icevga2(input wire nrst,
                  // done rendering
                  render_active <= 1'b0;
                  pixbuf_wr <= 1'b1; // deassert write to pixbuf
+                 render_cur_pixel_row <= render_cur_pixel_row + 4'd1; // advance to next pixel row
                end
              else
                begin
