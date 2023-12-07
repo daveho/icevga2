@@ -188,12 +188,12 @@ module icevga2(input wire nrst,
           render_cur_pixel_row <= 4'd0;
 
           render_cur_pattern <= 8'b10001010;
-          render_cur_bg_color <= 16'h0004;
-          render_cur_fg_color <= 16'h0cc0;
+          render_cur_bg_color <= 16'h0000;
+          render_cur_fg_color <= 16'h0000;
 
           render_next_pattern <= 8'b10001010;
           render_next_bg_color <= 16'h0004;
-          render_next_fg_color <= 16'h0880;
+          render_next_fg_color <= 16'h0cc0;
 
           pixbuf_wr <= 1'b1; // don't start writing yet
           pixbuf_wr_addr <= 10'd1016;
@@ -252,6 +252,9 @@ module icevga2(input wire nrst,
                 begin
                   // wake up
                   render_active <= 1'b1;
+                  pixbuf_wr_addr <= 1'b0;
+                  render_cur_bg_color <= 16'd0;
+                  render_cur_fg_color <= 16'd0;
                 end
             end
         end
