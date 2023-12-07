@@ -175,14 +175,21 @@ module icevga2(input wire nrst,
   // is being rendered
   reg[3:0] render_cur_pixel_row;
 
+  reg[7:0] render_next_pattern; // next pattern of 8 pixels
+
+  // The lowest 3 bits of pixbuf_wr_addr indicate which column of
+  // the current character is being rendered.
+  wire [2:0] render_cur_ch_col;
+  assign render_cur_ch_col = pixbuf_wr_addr[2:0];
+
   always @(posedge clk)
     begin
       if (nrst == 1'b0)
         begin
           // in reset
 
-          // for now, don't read from the character row buffer,
-          // the font memory, or the palette
+          // don't read from character row buffer, font memory,
+          // or palette yet
           chrowbuf_rd <= 1'b1;
           chrowbuf_rd_addr <= 8'd0;
           fontmem_rd <= 1'b1;
@@ -202,6 +209,7 @@ module icevga2(input wire nrst,
           render_cur_bg_color <= 16'd0;
           render_cur_fg_color <= 16'd0;
           render_cur_pixel_row <= 4'd0;
+          render_next_pattern <= 8'd0;
         end
      else
        begin
@@ -238,15 +246,26 @@ module icevga2(input wire nrst,
                end
 
              // Update pattern and bg/fg colors for next pixel
-             if (pixbuf_wr_addr[2:0] == 3'b111)
+             if (render_cur_ch_col == 3'd0)
+               begin
+                 // For now, read the appropriate row of one specific
+                 // glyph
+                 fontmem_rd_addr <= {8'd65, render_cur_pixel_row};
+                 fontmem_rd <= 1'b0;
+               end
+             else if (render_cur_ch_col == 3'd1)
+               begin
+                 // Font pattern data should be available now
+                 render_next_pattern <= fontmem_rd_data;
+                 fontmem_rd <= 1'b1;
+               end
+             else if (render_cur_ch_col == 3'd7)
                begin
                  // reached end of current pattern, activate next pattern
-                 // and fg/bg colors (hard-coded for now, eventually should
-                 // be pattern loaded from font memory and bg/fg colors
-                 // loaded from palette)
-                 render_cur_pattern <= 8'b10000000;
-                 //render_cur_bg_color <= {4'd0, pixbuf_wr_addr[3:0], 8'd0};
-                 render_cur_bg_color <= 16'h0006;
+                 // and fg/bg colors
+                 render_cur_pattern <= render_next_pattern;
+                 // TODO: make bg and fg colors be loaded from palette
+                 render_cur_bg_color <= {4'd0, 8'h03, 1'b0, pixbuf_wr_addr[5:3]};
                  render_cur_fg_color <= 16'h0ff0;
                end
              else
@@ -263,7 +282,8 @@ module icevga2(input wire nrst,
                  // done rendering
                  render_active <= 1'b0;
                  pixbuf_wr <= 1'b1; // deassert write to pixbuf
-                 render_cur_pixel_row <= render_cur_pixel_row + 4'd1; // advance to next pixel row
+                 //render_cur_pixel_row <= render_cur_pixel_row + 4'd1; // advance to next pixel row
+                 render_cur_pixel_row <= vcount[3:0];
                end
              else
                begin
