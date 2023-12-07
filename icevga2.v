@@ -230,6 +230,9 @@ module icevga2(input wire nrst,
              // write address to 9 positions from the end, because it will
              // be incremented when the first actual pixel is generated.)
              pixbuf_wr_addr <= 10'd1015;
+
+             // Determine next pixel row
+             render_cur_pixel_row <= vcount[3:0] + 4'd1;
            end
          else if (render_active == 1'b1)
            begin
@@ -246,11 +249,12 @@ module icevga2(input wire nrst,
                end
 
              // Update pattern and bg/fg colors for next pixel
+             // this is a state machine which requires multiple cycles)
              if (render_cur_ch_col == 3'd0)
                begin
                  // For now, read the appropriate row of one specific
                  // glyph
-                 fontmem_rd_addr <= {8'd65, render_cur_pixel_row};
+                 fontmem_rd_addr <= {8'd88, render_cur_pixel_row};
                  fontmem_rd <= 1'b0;
                end
              else if (render_cur_ch_col == 3'd1)
@@ -265,7 +269,8 @@ module icevga2(input wire nrst,
                  // and fg/bg colors
                  render_cur_pattern <= render_next_pattern;
                  // TODO: make bg and fg colors be loaded from palette
-                 render_cur_bg_color <= {4'd0, 8'h03, 1'b0, pixbuf_wr_addr[5:3]};
+                 //render_cur_bg_color <= {4'd0, 8'h03, 1'b0, pixbuf_wr_addr[5:3]};
+                 render_cur_bg_color <= 16'd4;
                  render_cur_fg_color <= 16'h0ff0;
                end
              else
@@ -283,7 +288,7 @@ module icevga2(input wire nrst,
                  render_active <= 1'b0;
                  pixbuf_wr <= 1'b1; // deassert write to pixbuf
                  //render_cur_pixel_row <= render_cur_pixel_row + 4'd1; // advance to next pixel row
-                 render_cur_pixel_row <= vcount[3:0];
+                 //render_cur_pixel_row <= vcount[3:0];
                end
              else
                begin
